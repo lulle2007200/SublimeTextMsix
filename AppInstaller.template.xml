@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AppInstaller 
+  Uri="{APPINSTALLER_URL}" 
+  Version="{APPINSTALLER_VERSION}"
+  xmlns="http://schemas.microsoft.com/appx/appinstaller/2018">
+  <MainPackage 
+    Name="SublimeText" 
+    Version="{VERSION}" 
+    Publisher="CN={CN}" 
+    ProcessorArchitecture="x64"
+    Uri="{PACKAGE_URL}" />
+  <UpdateSettings>
+    <OnLaunch HoursBetweenUpdateChecks="8" ShowPrompt="true" UpdateBlocksActivation="false" />
+  </UpdateSettings>
+</AppInstaller>
