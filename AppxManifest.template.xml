@@ -85,6 +85,15 @@
             <uap5:ExecutionAlias Alias="sublime_text.exe"/>
           </uap5:AppExecutionAlias>
         </uap5:Extension>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="any">
+            <uap:SupportedFileTypes>
+              <uap:FileType>.sublime_package</uap:FileType>
+              <uap:FileType>.sublime_workspace</uap:FileType>
+              <uap10:FileType>*</uap10:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
       </Extensions>
     </Application>
     
