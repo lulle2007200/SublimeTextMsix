@@ -46,7 +46,7 @@ jobs:
         name: get previous tag
         id: previoustag
         with:
-          fallback: 1.0.0.0
+          fallback: '0'
           prefix: ${{ inputs.channel }}_
 
       - shell: pwsh
@@ -96,9 +96,10 @@ jobs:
         id: get_release_info
         if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' }}
         run: |
-          $tag_name = "${{ inputs.channel }}_$(Get-Content -Path ./out/version.txt)"
+          $ver = Get-Content -Path "./out/version.txt"
+          $tag_name = "${{ inputs.channel }}_$($ver)"
           Write-Output "::set-output name=TAG_NAME::$($tag_name)"
-          Write-Output "::set-output name=TITLE::Sublime Text ${{ inputs.channel }} ($($tag_name))"
+          Write-Output "::set-output name=TITLE::Sublime Text ${{ inputs.channel }} ($($ver))"
 
       - shell: pwsh
         name: make dev appinstaller and release note
@@ -143,8 +144,8 @@ jobs:
           artifacts: out/*.crt,out/*.msix,out/*.appinstaller
           commit: master
           tag: Dev_Latest
-          name: Latest Sublime Text Dev (${{ steps.get_release_info.outputs.TITLE }})
-          bodyFile: out/SublimeText_release_note.html
+          name: Latest Sublime Text Dev
+          body: This release always  contains the latest dev release
 
       - uses: ncipollo/release-action@v1.14.0
         name: create dev release
