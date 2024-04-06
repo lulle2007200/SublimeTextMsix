@@ -1,3 +1,4 @@
+[1712446626] Add basic file type associations
 [1712423259] Initial Release
 [1712423259] Should work just like the unpackaged version, except for the integrated auto update command (see below)
 [1712423259] Writes to %appdata%/sublime text are not virtualized and persist when uninstalling
