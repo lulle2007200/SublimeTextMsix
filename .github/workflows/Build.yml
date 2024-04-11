@@ -20,6 +20,10 @@ on:
         required: false
         default: "Stable"
         type: string
+      do_release: 
+        required: false
+        default: false
+        type: boolean
     secrets:
       private_key_pfx_base64:
         required: true
@@ -57,10 +61,10 @@ jobs:
           if("${{ steps.previoustag.outputs.tag }}" -ne "0"){ Write-Output "::set-output name=TAG::${{ steps.previoustag.outputs.tag }}";  Write-Output "::set-output name=TIMESTAMP::${{ steps.previoustag.outputs.timestamp }}"}
 
       - shell: pwsh
-        name: install psake
+        name: install invoke-build
         run: |
           set-psrepository psgallery -installationpolicy trusted
-          Install-Module -Name psake -repository psgallery
+          Install-Module -Name InvokeBuild -repository psgallery
 
       - shell: pwsh
         name: get previous version from tag
@@ -72,13 +76,23 @@ jobs:
           Write-Output "::set-output name=PREV_VERSION::$($ver)"
 
       - shell: pwsh
-        name: check for package updates
-        if: ${{ inputs.build_only_when_update_available }}
+        name: check for package updates and get new package version
         id: check_update
         run: |
-          Import-Module psake
-          invoke-psake ./build.ps1 -task CanUpdate -parameters @{"previous_package_version"="${{ steps.previous_version.outputs.PREV_VERSION }}";"channel"="${{ inputs.channel }}"}
-          Write-Output "::set-output name=UPDATE_AVAILABLE::$($psake.build_success)"
+          Import-Module InvokeBuild
+          Invoke-Build -task CanUpdate, GetPackageVersion -build_number "${{ inputs.build_number }}" -previous_package_version "${{ steps.previous_version.outputs.PREV_VERSION }}" -channel "${{ inputs.channel }}" -build_result "R"
+          Write-Output "::set-output name=UPDATE_AVAILABLE::$($R.can_update)"
+          Write-Output "::set-output name=NEW_VERSION::$($R.package_version)"
+
+      - shell: pwsh
+        name: get release info
+        id: get_release_info
+        if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' }}
+        run: |
+          $ver = ${{ steps.check_update.outputs.NEW_VERSION }}
+          $tag_name = "${{ inputs.channel }}_$($ver)"
+          Write-Output "::set-output name=TAG_NAME::$($tag_name)"
+          Write-Output "::set-output name=TITLE::Sublime Text ${{ inputs.channel }} ($($ver))"
 
       - shell: pwsh
         name: build
@@ -87,54 +101,26 @@ jobs:
         run: |
           $VsInstance = Get-VsSetupInstance -All | Select-VsSetupInstance -Latest
           & "$($VsInstance.InstallationPath)\Common7\Tools\Launch-VsDevShell.ps1" -SkipAutomaticLocation
-          Import-Module psake
-          invoke-psake ./build.ps1 -parameters @{"cert_base64"="${{ secrets.private_key_pfx_base64 }}";"cert_password"="${{ secrets.private_key_password }}";"public_cert_base64"="${{ inputs.public_cert_base64 }}";"package_name"="SublimeText";"previous_package_version"="${{ steps.previous_version.outputs.PREV_VERSION }}";"build_number_override"="${{ inputs.build_number }}";"previous_package_timestamp"="${{ steps.previoustag_timestamp.outputs.TIMESTAMP }}";"channel"="${{ inputs.channel }}"}
-          Write-Output "::set-output name=BUILD_SUCCESS::$($psake.build_success)"
+          Import-Module InvokeBuild
+          $package_base_url = "${{ github.server_url }}/${{ github.repository }}/releases/download/${{ steps.get_release_info.outputs.TAG_NAME }}"
+          $appinstaller_base_url = "${{ github.server_url }}/${{ github.repository }}/releases/" + $(if("${{ inputs.channel }}" -eq "Stable"){"latest/download"}else{"download/Dev_Latest"})
+          Invoke-Build -package_base_url "$($package_base_url)" -appinstaller_base_url "$($appinstaller_base_url)" -cert_base64 "${{ secrets.private_key_pfx_base64 }}" -cert_password "${{ secrets.private_key_password }}" -public_cert_base64 "${{ inputs.public_cert_base64 }}" -package_name "SublimeText" -previous_package_version "${{ steps.previous_version.outputs.PREV_VERSION }}" -build_number "${{ inputs.build_number }}" -previous_package_timestamp "${{ steps.previoustag_timestamp.outputs.TIMESTAMP }}" -channel "${{ inputs.channel }}" -result R
+          Write-Output "::set-output name=BUILD_SUCCESS::$(! $R.Errors)"
         
-      - shell: pwsh
-        name: get release info
-        id: get_release_info
-        if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' }}
-        run: |
-          $ver = Get-Content -Path "./out/version.txt"
-          $tag_name = "${{ inputs.channel }}_$($ver)"
-          Write-Output "::set-output name=TAG_NAME::$($tag_name)"
-          Write-Output "::set-output name=TITLE::Sublime Text ${{ inputs.channel }} ($($ver))"
-
-      - shell: pwsh
-        name: make dev appinstaller and release note
-        if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' && inputs.channel == 'Dev'}}
-        run: |
-          $ver = Get-Content -Path ./out/version.txt
-          $package_base_url = "${{ github.server_url }}/${{ github.repository }}/releases/download/${{ steps.get_release_info.outputs.TAG_NAME }}"
-          $appinstaller_base_url = "${{ github.server_url }}/${{ github.repository }}/releases/download/Dev_Latest"
-          Import-Module psake
-          Invoke-Psake build.ps1 -task MakeAppInstallerAndReleaseNote -parameters @{"changelog_path_override"="./out/SublimeText_changelog.html";"package_version"="$($ver)";"package_base_url"="$($package_base_url)";"appinstaller_base_url"="$($appinstaller_base_url)";"cert_base64"="${{ secrets.private_key_pfx_base64 }}";"cert_password"="${{ secrets.private_key_password }}"}
-
-      - shell: pwsh
-        name: make stable appinstaller and release note 
-        if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' && inputs.channel == 'Stable'}}
-        run: |
-          $ver = Get-Content -Path ./out/version.txt
-          $package_base_url = "${{ github.server_url }}/${{ github.repository }}/releases/download/${{ steps.get_release_info.outputs.TAG_NAME }}"
-          $appinstaller_base_url = "${{ github.server_url }}/${{ github.repository }}/releases/latest/download"
-          Import-Module psake 
-          Invoke-Psake build.ps1 -task MakeAppInstallerAndReleaseNote -parameters @{"changelog_path_override"="./out/SublimeText_changelog.html";"package_version"="$($ver)";"package_base_url"="$($package_base_url)";"appinstaller_base_url"="$($appinstaller_base_url)";"cert_base64"="${{ secrets.private_key_pfx_base64 }}";"cert_password"="${{ secrets.private_key_password }}"}
-
       - uses: ncipollo/release-action@v1.14.0
         name: create stable release
-        if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' && inputs.channel == 'Stable'}}
+        if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' && inputs.channel == 'Stable' && inputs.do_release }}
         with:
           makeLatest: true
           artifacts: out/*.crt,out/*.msix,out/*.appinstaller
           commit: master
           tag: ${{ steps.get_release_info.outputs.TAG_NAME }}
           name: ${{ steps.get_release_info.outputs.TITLE }}
-          bodyFile: out/SublimeText_release_note.html
+          bodyFile: out/SublimeText.html
 
       - uses: ncipollo/release-action@v1.14.0
         name: update latest dev release
-        if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' && inputs.channel == 'Dev'}}
+        if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' && inputs.channel == 'Dev' && inputs.do_release }}
         with:
           prerelease: true
           makeLatest: false
@@ -149,7 +135,7 @@ jobs:
 
       - uses: ncipollo/release-action@v1.14.0
         name: create dev release
-        if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' && inputs.channel == 'Dev'}}
+        if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' && inputs.channel == 'Dev' && inputs.do_release }}
         with:
           prerelease: true
           makeLatest: false
@@ -157,6 +143,12 @@ jobs:
           commit: master
           tag: ${{ steps.get_release_info.outputs.TAG_NAME }}
           name: ${{ steps.get_release_info.outputs.TITLE }}
-          bodyFile: out/SublimeText_release_note.html
+          bodyFile: out/SublimeText.html
+
+      - uses: actions/upload-artifact@v4
+        name: upload artifacts
+        if: ${{ ! inputs.do_release }}
+        with:
+          path: ./out/*
 
 
