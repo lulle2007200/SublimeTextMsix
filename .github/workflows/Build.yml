@@ -104,7 +104,7 @@ jobs:
           Import-Module InvokeBuild
           $package_base_url = "${{ github.server_url }}/${{ github.repository }}/releases/download/${{ steps.get_release_info.outputs.TAG_NAME }}"
           $appinstaller_base_url = "${{ github.server_url }}/${{ github.repository }}/releases/" + $(if("${{ inputs.channel }}" -eq "Stable"){"latest/download"}else{"download/Dev_Latest"})
-          Invoke-Build -package_base_url "$($package_base_url)" -appinstaller_base_url "$($appinstaller_base_url)" -cert_base64 "${{ secrets.private_key_pfx_base64 }}" -cert_password "${{ secrets.private_key_password }}" -public_cert_base64 "${{ inputs.public_cert_base64 }}" -package_name "SublimeText" -previous_package_version "${{ steps.previous_version.outputs.PREV_VERSION }}" -build_number "${{ inputs.build_number }}" -previous_package_timestamp "${{ steps.previoustag_timestamp.outputs.TIMESTAMP }}" -channel "${{ inputs.channel }}" -result R
+          Invoke-Build -package_base_url "$($package_base_url)" -appinstaller_base_url "$($appinstaller_base_url)" -cert_base64 "${{ secrets.private_key_pfx_base64 }}" -cert_pass "${{ secrets.private_key_password }}" -public_cert_base64 "${{ inputs.public_cert_base64 }}" -package_name "SublimeText" -previous_package_version "${{ steps.previous_version.outputs.PREV_VERSION }}" -build_number "${{ inputs.build_number }}" -previous_package_timestamp "${{ steps.previoustag_timestamp.outputs.TIMESTAMP }}" -channel "${{ inputs.channel }}" -result R
           Write-Output "::set-output name=BUILD_SUCCESS::$(! $R.Errors)"
         
       - uses: ncipollo/release-action@v1.14.0

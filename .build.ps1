@@ -22,7 +22,7 @@ param(
       $cert_base64,
 
       $public_cert_path,
-      $public_cert_base_64,
+      $public_cert_base64,
 
       $package_base_url,
       $appinstaller_base_url,
