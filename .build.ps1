@@ -197,7 +197,7 @@ task CollectPri MakePri, {
 }
 
 task MakeShellExt {
-    exec { msbuild "$($shellext_sln)" /t:Rebuild /p:Configuration=Release /p:Platform=x64 /p:OutDir="$($shellext_dir)/"  }
+    exec { msbuild "$($shellext_sln)" /t:Rebuild /restore /p:RestorePackagesConfig=true /p:Configuration=Release /p:Platform=x64 /p:OutDir="$($shellext_dir)/"  }
 }
 
 task CollectShellExt MakeShellExt, {
