@@ -24,7 +24,7 @@ on:
 
 jobs:
   build:
-    uses: lulle2007200/SublimeTextMsix/.github/workflows/Build.yml@master
+    uses: lulle2007200/SublimeTextMsix/.github/workflows/Build.yml@dev
     with:
       public_cert_base64: ${{ vars.LULLE2007200_CA_CRT_BASE64 }}
       build_only_when_update_available: ${{ inputs.build_only_when_update_available }}
