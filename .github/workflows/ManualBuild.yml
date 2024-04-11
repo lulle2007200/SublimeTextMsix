@@ -21,6 +21,10 @@ on:
         options:
           - Stable
           - Dev
+      do_release:
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   build:

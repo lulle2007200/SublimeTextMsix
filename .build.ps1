@@ -68,6 +68,8 @@ $instructions = ""
 $release_note_path = "$($build_dir)/$($package_name).html"
 
 $build_results = @{}
+$build_results["build_number"] = "$($build_number)"
+$build_results["package_version"] = "$($package_version)"
 
 
 task GetBuildNumber -If (! $build_number) {
