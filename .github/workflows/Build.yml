@@ -89,7 +89,7 @@ jobs:
         name: get release info
         id: get_release_info
         run: |
-          $ver = ${{ steps.check_update.outputs.NEW_VERSION }}
+          $ver = "${{ steps.check_update.outputs.NEW_VERSION }}"
           $tag_name = "${{ inputs.channel }}_$($ver)"
           Write-Output "::set-output name=TAG_NAME::$($tag_name)"
           Write-Output "::set-output name=TITLE::Sublime Text ${{ inputs.channel }} ($($ver))"
