@@ -103,7 +103,7 @@ task PreparePackage ExtractPackage, DeleteUnneededFromPackage, AddMsixUtilPlugin
 # Certificates
 task GetPublicCert -If {! (Test-Path -Path "$($public_cert_local_path)" -Type Leaf)} {
     requires -Variable public_cert_base64
-    $script:public_cert_local_path = "$($build_dir)/public.crt"
+    $script:public_cert_local_path = "$($build_dir)/public_cert.crt"
     $content = [Convert]::FromBase64String($public_cert_base64)
     [IO.File]::WriteAllBytes($public_cert_local_path, $content)
 }
