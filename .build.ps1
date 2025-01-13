@@ -2,15 +2,20 @@ param(
       $package_release_channel = "stable",
       $package_build_number,
 
-      $public_cert_local_path = "$($BuildRoot)/../Cert/RootCa.crt",
-      $private_cert_local_path = "$($BuildRoot)/../Cert/CodeSign.pfx",
-      $private_cert_pwd = "P94ssMf8Y23meCF",
+      $public_cert_local_path,
+      $private_cert_local_path,
+      $private_cert_pwd,
+      $public_cert_base64,
+      $private_cert_base64,
 
       $appinstaller_base_url,
       $package_base_url,
 
       $previous_msix_package_build_number,
-      $previous_msix_package_timestamp
+      $previous_msix_package_timestamp,
+
+
+      $build_result="R"
 )
 
 $build_dir_base = "$($BuildRoot)/build"
@@ -45,11 +50,17 @@ $shellext_sln_local_path = "$($BuildRoot)/ShellExt/ShellExt.sln"
 $shellext_dir = "$($build_dir_base)/ShellExt"
 
 $out_files = @{}
+$build_results = @{}
+$build_results["out"] = "$($out_dir)"
 
 
-task GetPackageBuildNumber -If {! $package_build_number} {
+task GetPackageBuildNumber1 -If {! $package_build_number} {
     $version_url = "$($base_url)/latest/$($package_release_channel.ToLower())"
     $script:package_build_number = $(Invoke-WebRequest -Uri "$version_url").content.Trim()
+}
+
+task GetPackageBuildNumber -Jobs GetPackageBuildNumber1, {
+    $script:build_results["package_build_number"] = $script:package_build_number
 }
 
 task GetDownloadUrl GetPackageBuildNumber, {
@@ -150,6 +161,7 @@ task GetMsixPackageBuildNumber -Jobs GetPreviousMsixPackageBuildNumber, GetPacka
         $msix_package_version = [System.Version]::new($previous_msix_package_version.Major, $previous_msix_package_version.Minor, $previous_msix_package_version.Build + 1, $previous_msix_package_version.Revision)
     }
     $script:msix_package_build_number = $msix_package_version.ToString()
+    $script:build_results["new_msix_build_number"] = $script:msix_package_build_number
 }
 
 task MakeManifest -Jobs GetPrivateCertCN, GetMsixPackageBuildNumber, MakeBuildDir, {
@@ -298,7 +310,11 @@ task CollectAppInstallerFile -Jobs MakeAppInstallerFile, {
 
 }
 
-task CollectOutFiles CollectMsixPackage, ?CollectAppInstallerFile, CollectReleaseInfo
+task CollectPublicCert -Jobs GetPublicCert, {
+    $out_files["$($public_cert_local_path)"] = "./"
+}
+
+task CollectOutFiles CollectMsixPackage, ?CollectAppInstallerFile, CollectReleaseInfo, ?CollectPublicCert
 
 task PrepareRelease -Jobs CollectOutFiles, MakeOutDir, {
     foreach($item in $out_files.GetEnumerator()){
@@ -313,6 +329,24 @@ task MakeBuildDir -If {! (Test-Path -Path $($build_dir) -Type Container)} {
 
 task MakeOutDir -If {! (Test-Path -Path $($out_dir) -Type Container)} {
     New-Item -Type Directory -Path "$($out_dir)"
+}
+
+task CanUpdate -Jobs GetPreviousMsixPackageBuildNumber, GetPackageBuildNumber, {
+    $prev = [System.Version]::new("$($previous_msix_package_build_number)")
+    $cur = [System.Version]::new("$($package_build_number.SubString(0,1))","$($package_build_number.SubString(1))",0,0)
+    $can_update = $false
+    if($cur -gt $prev){
+        $can_update = $true
+    }
+    $script:build_results["can_update"] = $can_update
+}
+
+task UpdateCheck CanUpdate, GetMsixPackageBuildNumber, GetPackageBuildNumber
+
+Exit-Build {
+    if($build_result){
+        New-Variable -Name "$($build_result)" -Value $build_results -Scope Global -Force
+    }
 }
 
 task . MakeBuildDir, ExtractPackage

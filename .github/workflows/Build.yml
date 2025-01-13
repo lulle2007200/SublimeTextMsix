@@ -1,0 +1,154 @@
+name: Build
+
+on:
+  workflow_call:
+    inputs:
+      build_only_when_update_available:
+        required: false
+        default: false
+        type: boolean
+      build_number:
+        required: false
+        default: ""
+        type: string
+      public_cert_base64:
+        required: true
+        type: string
+      channel:
+        required: false
+        default: "Stable"
+        type: string
+      do_release: 
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      private_key_pfx_base64:
+        required: true
+      private_key_password:
+        required: true
+
+concurrency:
+  group: prod
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+      - uses: actions/checkout@v4.1.2
+        name: checkout
+        with:
+          fetch-depth: 0
+
+      - uses: WyriHaximus/github-action-get-previous-tag@v1
+        name: get previous tag
+        id: previoustag
+        with:
+          fallback: '0'
+          prefix: ${{ inputs.channel }}_
+
+      - shell: pwsh
+        name: get previous tag and timestamp
+        id: previoustag_timestamp
+        run: |
+          if("${{ steps.previoustag.outputs.tag }}" -eq "0"){ Write-Output "TAG=0.0.0.0" >> $GITHUB_OUTPUT;  Write-Output "TIMESTAMP=0" >> $GITHUB_OUTPUT}
+          if("${{ steps.previoustag.outputs.tag }}" -ne "0"){ Write-Output "TAG=${{ steps.previoustag.outputs.tag }}" >> $GITHUB_OUTPUT;  Write-Output "TIMESTAMP=${{ steps.previoustag.outputs.timestamp }}" >> $GITHUB_OUTPUT}
+
+      - shell: pwsh
+        name: install invoke-build
+        run: |
+          set-psrepository psgallery -installationpolicy trusted
+          Install-Module -Name InvokeBuild -repository psgallery
+
+      - shell: pwsh
+        name: get previous version from tag
+        id: previous_version
+        run: |
+          $tag = "${{ steps.previoustag_timestamp.outputs.TAG }}"
+          $tag -match "^.*?([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)"
+          $ver = $matches[1]
+          Write-Output "PREV_VERSION=$($ver)" >> $GITHUB_OUTPUT
+
+      - shell: pwsh
+        name: check for package updates and get new package version
+        id: check_update
+        run: |
+          Import-Module InvokeBuild
+          Invoke-Build -task UpdateCheck -package_build_number "${{ inputs.build_number }}" -previous_msix_package_build_number "${{ steps.previous_version.outputs.PREV_VERSION }}" -package_release_channel "${{ inputs.channel }}"
+          Write-Output "UPDATE_AVAILABLE=$($R.can_update)" >> $GITHUB_OUTPUT
+          Write-Output "NEW_MSIX_BUILD_NUMBER=$($R.new_msix_build_number)" >> $GITHUB_OUTPUT
+          Write-Output "PACKAGE_BUILD_NUMBER=$($R.package_build_number)" >> $GITHUB_OUTPUT
+
+      - shell: pwsh
+        name: get release info
+        id: get_release_info
+        run: |
+          $ver = "${{ steps.check_update.outputs.NEW_MSIX_BUILD_NUMBER }}"
+          $tag_name = "${{ inputs.channel }}_$($ver)"
+          Write-Output "TAG_NAME=$($tag_name)" >> $GITHUB_OUTPUT
+          Write-Output "TITLE=Sublime Text ${{ inputs.channel }} ($($ver))" >> $GITHUB_OUTPUT
+
+      - shell: pwsh
+        name: build
+        id: build
+        if: ${{ ! inputs.build_only_when_update_available || steps.check_update.outputs.UPDATE_AVAILABLE == 'True' }}
+        run: |
+          $VsInstance = Get-VsSetupInstance -All | Select-VsSetupInstance -Latest
+          & "$($VsInstance.InstallationPath)\Common7\Tools\Launch-VsDevShell.ps1" -SkipAutomaticLocation
+          Import-Module InvokeBuild
+          $package_base_url = "${{ github.server_url }}/${{ github.repository }}/releases/download/${{ steps.get_release_info.outputs.TAG_NAME }}"
+          $appinstaller_base_url = "${{ github.server_url }}/${{ github.repository }}/releases/" + $(if("${{ inputs.channel }}" -eq "Stable"){"latest/download"}else{"download/Dev_Latest"})
+          Invoke-Build -package_base_url "$($package_base_url)" -appinstaller_base_url "$($appinstaller_base_url)" -private_cert_base64 "${{ secrets.private_key_pfx_base64 }}" -private_cert_pwd "${{ secrets.private_key_password }}" -public_cert_base64 "${{ inputs.public_cert_base64 }}" -previous_msix_package_build_number "${{ steps.previous_version.outputs.PREV_VERSION }}" -package_build_number "${{ steps.check_update.outputs.PACKAGE_BUILD_NUMBER }}" -previous_msix_package_timestamp "${{ steps.previoustag_timestamp.outputs.TIMESTAMP }}" -channel "${{ inputs.channel }}"
+          Write-Output "BUILD_SUCCESS=$(! $R.Errors)" >> $GITHUB_OUTPUT
+          Write-Output "OUT_DIR=$R.out" >> $GITHUB_OUTPUT
+        
+      - uses: ncipollo/release-action@v1.14.0
+        name: create stable release
+        if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' && inputs.channel == 'Stable' && inputs.do_release }}
+        with:
+          makeLatest: true
+          artifacts: ${{ steps.build.outputs.OUT_DIR }}/*.crt,${{ steps.build.outputs.OUT_DIR }}/*.msix,${{ steps.build.outputs.OUT_DIR }}/*.appinstaller
+          commit: master
+          tag: ${{ steps.get_release_info.outputs.TAG_NAME }}
+          name: ${{ steps.get_release_info.outputs.TITLE }}
+          bodyFile: ${{ steps.build.outputs.OUT_DIR }}/release_note.xml
+
+      - uses: ncipollo/release-action@v1.14.0
+        name: update latest dev release
+        if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' && inputs.channel == 'Dev' && inputs.do_release }}
+        with:
+          prerelease: true
+          makeLatest: false
+          removeArtifacts: true
+          replacesArtifacts: true
+          allowUpdates: true
+          artifacts: ${{ steps.build.outputs.OUT_DIR }}/*.crt,${{ steps.build.outputs.OUT_DIR }}/*.msix,${{ steps.build.outputs.OUT_DIR }}/*.appinstaller
+          commit: master
+          tag: Dev_Latest
+          name: Latest Sublime Text Dev
+          body: This release always  contains the latest dev release
+
+      - uses: ncipollo/release-action@v1.14.0
+        name: create dev release
+        if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' && inputs.channel == 'Dev' && inputs.do_release }}
+        with:
+          prerelease: true
+          makeLatest: false
+          artifacts: ${{ steps.build.outputs.OUT_DIR }}/*.crt,${{ steps.build.outputs.OUT_DIR }}/*.msix,${{ steps.build.outputs.OUT_DIR }}/*.appinstaller
+          commit: master
+          tag: ${{ steps.get_release_info.outputs.TAG_NAME }}
+          name: ${{ steps.get_release_info.outputs.TITLE }}
+          bodyFile: ${{ steps.build.outputs.OUT_DIR }}/release_note.xml
+
+      - uses: actions/upload-artifact@v4
+        name: upload artifacts
+        if: ${{ ! inputs.do_release }}
+        with:
+          path: .${{ steps.build.outputs.OUT_DIR }}/*
+
+

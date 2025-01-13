@@ -1,0 +1,32 @@
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+name: AutoUpdate
+
+permissions:
+  contents: write
+
+jobs:
+  update_dev:
+    uses: ./.github/workflows/Build.yml
+    with:
+      public_cert_base64: ${{ vars.LULLE2007200_CA_CRT_BASE64 }}
+      build_only_when_update_available: true
+      channel: Dev
+      do_release: true
+    secrets:
+      private_key_pfx_base64: ${{ secrets.LULLE2007200_CS_PFX_BASE64 }}
+      private_key_password: ${{ secrets.LULLE2007200_CS_PFX_PASS }}
+
+  update_stable:
+    uses: lulle2007200/SublimeTextMsix/.github/workflows/Build.yml@master
+    with:
+      public_cert_base64: ${{ vars.LULLE2007200_CA_CRT_BASE64 }}
+      build_only_when_update_available: true
+      channel: Stable
+      do_release: true
+    secrets:
+      private_key_pfx_base64: ${{ secrets.LULLE2007200_CS_PFX_BASE64 }}
+      private_key_password: ${{ secrets.LULLE2007200_CS_PFX_PASS }}
