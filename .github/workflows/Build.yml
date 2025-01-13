@@ -56,8 +56,8 @@ jobs:
         name: get previous tag and timestamp
         id: previoustag_timestamp
         run: |
-          if("${{ steps.previoustag.outputs.tag }}" -eq "0"){ Write-Output "TAG=0.0.0.0" >> $GITHUB_OUTPUT;  Write-Output "TIMESTAMP=0" >> $GITHUB_OUTPUT}
-          if("${{ steps.previoustag.outputs.tag }}" -ne "0"){ Write-Output "TAG=${{ steps.previoustag.outputs.tag }}" >> $GITHUB_OUTPUT;  Write-Output "TIMESTAMP=${{ steps.previoustag.outputs.timestamp }}" >> $GITHUB_OUTPUT}
+          if("${{ steps.previoustag.outputs.tag }}" -eq "0"){ Write-Output "TAG=0.0.0.0" >> $env:GITHUB_OUTPUT;  Write-Output "TIMESTAMP=0" >> $env:GITHUB_OUTPUT}
+          if("${{ steps.previoustag.outputs.tag }}" -ne "0"){ Write-Output "TAG=${{ steps.previoustag.outputs.tag }}" >> $env:GITHUB_OUTPUT;  Write-Output "TIMESTAMP=${{ steps.previoustag.outputs.timestamp }}" >> $env:GITHUB_OUTPUT}
 
       - shell: pwsh
         name: install invoke-build
@@ -72,7 +72,7 @@ jobs:
           $tag = "${{ steps.previoustag_timestamp.outputs.TAG }}"
           $tag -match "^.*?([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)"
           $ver = $matches[1]
-          Write-Output "PREV_VERSION=$($ver)" >> $GITHUB_OUTPUT
+          Write-Output "PREV_VERSION=$($ver)" >> $env:GITHUB_OUTPUT
 
       - shell: pwsh
         name: check for package updates and get new package version
@@ -80,9 +80,9 @@ jobs:
         run: |
           Import-Module InvokeBuild
           Invoke-Build -task UpdateCheck -package_build_number "${{ inputs.build_number }}" -previous_msix_package_build_number "${{ steps.previous_version.outputs.PREV_VERSION }}" -package_release_channel "${{ inputs.channel }}"
-          Write-Output "UPDATE_AVAILABLE=$($R.can_update)" >> $GITHUB_OUTPUT
-          Write-Output "NEW_MSIX_BUILD_NUMBER=$($R.new_msix_build_number)" >> $GITHUB_OUTPUT
-          Write-Output "PACKAGE_BUILD_NUMBER=$($R.package_build_number)" >> $GITHUB_OUTPUT
+          Write-Output "UPDATE_AVAILABLE=$($R.can_update)" >> $env:GITHUB_OUTPUT
+          Write-Output "NEW_MSIX_BUILD_NUMBER=$($R.new_msix_build_number)" >> $env:GITHUB_OUTPUT
+          Write-Output "PACKAGE_BUILD_NUMBER=$($R.package_build_number)" >> $env:GITHUB_OUTPUT
 
       - shell: pwsh
         name: get release info
@@ -90,8 +90,8 @@ jobs:
         run: |
           $ver = "${{ steps.check_update.outputs.NEW_MSIX_BUILD_NUMBER }}"
           $tag_name = "${{ inputs.channel }}_$($ver)"
-          Write-Output "TAG_NAME=$($tag_name)" >> $GITHUB_OUTPUT
-          Write-Output "TITLE=Sublime Text ${{ inputs.channel }} ($($ver))" >> $GITHUB_OUTPUT
+          Write-Output "TAG_NAME=$($tag_name)" >> $env:GITHUB_OUTPUT
+          Write-Output "TITLE=Sublime Text ${{ inputs.channel }} ($($ver))" >> $env:GITHUB_OUTPUT
 
       - shell: pwsh
         name: build
@@ -104,8 +104,8 @@ jobs:
           $package_base_url = "${{ github.server_url }}/${{ github.repository }}/releases/download/${{ steps.get_release_info.outputs.TAG_NAME }}"
           $appinstaller_base_url = "${{ github.server_url }}/${{ github.repository }}/releases/" + $(if("${{ inputs.channel }}" -eq "Stable"){"latest/download"}else{"download/Dev_Latest"})
           Invoke-Build -package_base_url "$($package_base_url)" -appinstaller_base_url "$($appinstaller_base_url)" -private_cert_base64 "${{ secrets.private_key_pfx_base64 }}" -private_cert_pwd "${{ secrets.private_key_password }}" -public_cert_base64 "${{ inputs.public_cert_base64 }}" -previous_msix_package_build_number "${{ steps.previous_version.outputs.PREV_VERSION }}" -package_build_number "${{ steps.check_update.outputs.PACKAGE_BUILD_NUMBER }}" -previous_msix_package_timestamp "${{ steps.previoustag_timestamp.outputs.TIMESTAMP }}" -channel "${{ inputs.channel }}"
-          Write-Output "BUILD_SUCCESS=$(! $R.Errors)" >> $GITHUB_OUTPUT
-          Write-Output "OUT_DIR=$R.out" >> $GITHUB_OUTPUT
+          Write-Output "BUILD_SUCCESS=$(! $R.Errors)" >> $env:GITHUB_OUTPUT
+          Write-Output "OUT_DIR=$R.out" >> $env:GITHUB_OUTPUT
         
       - uses: ncipollo/release-action@v1.14.0
         name: create stable release
