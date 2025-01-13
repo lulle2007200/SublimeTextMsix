@@ -1,0 +1,39 @@
+name: ManualBuild
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_only_when_update_available:
+        required: false
+        default: false
+        type: boolean
+      build_number:
+        required: false
+        default: ""
+        type: string
+      channel:
+        required: true
+        default: Stable
+        type: choice
+        options:
+          - Stable
+          - Dev
+      do_release:
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    uses: ./.github/workflows/Build.yml
+    with:
+      public_cert_base64: ${{ vars.LULLE2007200_CA_CRT_BASE64 }}
+      build_only_when_update_available: ${{ inputs.build_only_when_update_available }}
+      build_number: ${{ inputs.build_number }}
+      channel: ${{ inputs.channel }}
+    secrets:
+      private_key_pfx_base64: ${{ secrets.LULLE2007200_CS_PFX_BASE64 }}
+      private_key_password: ${{ secrets.LULLE2007200_CS_PFX_PASS }}
