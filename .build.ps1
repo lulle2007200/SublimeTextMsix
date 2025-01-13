@@ -3,8 +3,8 @@ param(
       $package_build_number,
 
       $public_cert_local_path,
-      $private_cert_local_path,
-      $private_cert_pwd,
+      $private_cert_local_path = "$($BuildRoot)/../Cert/CodeSign.pfx",
+      $private_cert_pwd = "P94ssMf8Y23meCF",
       $public_cert_base64,
       $private_cert_base64,
 
@@ -349,4 +349,4 @@ Exit-Build {
     }
 }
 
-task . MakeBuildDir, ExtractPackage
+task . MakeBuildDir, PrepareRelease
