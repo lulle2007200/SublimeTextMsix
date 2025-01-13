@@ -6,12 +6,16 @@ param(
       $private_cert_local_path = "$($BuildRoot)/../Cert/CodeSign.pfx",
       $private_cert_pwd = "P94ssMf8Y23meCF",
 
-      $previous_msix_package_build_number
+      $appinstaller_base_url,
+      $package_base_url,
+
+      $previous_msix_package_build_number,
+      $previous_msix_package_timestamp
 )
 
 $build_dir_base = "$($BuildRoot)/build"
 $build_dir = "$($build_dir_base)/$($package_release_channel)"
-$out_dir = "$($BuildRoot)/$($package_release_channel)/out"
+$out_dir = "$($BuildRoot)/out/$($package_release_channel)"
 
 $base_url = "https://download.sublimetext.com"
 $timestamp_url = "http://timestamp.sectigo.com"
@@ -28,8 +32,19 @@ $msix_package_name = "SublimeText_$($package_release_channel)_x64"
 $msix_package = "$($build_dir)/$($msix_package_name).msix"
 $msix_package_files = @{}
 
+$appinstaller_template_local_path = "$($BuildRoot)/AppInstaller.template.xml"
+$appinstaller_local_path = "$($build_dir)/$($msix_package_name).appinstaller"
+$appinstaller_version = "1.0.0.0"
+$changelog_local_path = "$($build_dir)/changelog.xml"
+$release_note_local_path = "$($build_dir)/release_note.xml"
+
+$instructions_template_local_path = "$($BuildRoot)/install_instructions.template.xml"
+$full_changelog_local_path = "$($BuildRoot)/changelog.txt"
+
 $shellext_sln_local_path = "$($BuildRoot)/ShellExt/ShellExt.sln"
 $shellext_dir = "$($build_dir_base)/ShellExt"
+
+$out_files = @{}
 
 
 task GetPackageBuildNumber -If {! $package_build_number} {
@@ -111,16 +126,21 @@ task GetPrivateCertCN -Jobs GetPrivateCert, {
 # prepare msix package
 task GetPreviousMsixPackageBuildNumber -If {! $previous_msix_package_build_number} {
     if(Test-Path -Type Leaf -Path "$($build_dir)/prev_version.txt"){
-        $script:previous_msix_package_build_number = (Get-Content -Path "$($build_dir)/prev_version.txt" -TotalCount 1)
+        $content = Get-Content -Path "$($build_dir)/prev_version.txt" -TotalCount 2
+        $script:previous_msix_package_build_number = $content | Select-Object -Index 0
+        $script:previous_msix_package_timestamp = $content | Select-Object -Index 1
     }elseif(Test-Path -Type Leaf -Path "$($BuildRoot)/prev_version.txt"){
-        $script:previous_msix_package_build_number = (Get-Content -Path "$($BuildRoot)/prev_version.txt" -TotalCount 1)
+        $content = Get-Content -Path "$($BuildRoot)/prev_version.txt" -TotalCount 2
+        $script:previous_msix_package_build_number = $content | Select-Object -Index 0
+        $script:previous_msix_package_timestamp = $content | Select-Object -Index 1
     }else{
         $script:previous_msix_package_build_number = "0.0.0.0"
+        $script:previous_msix_package_timestamp = "0"
     }
 }
 
 task WriteMsixPackageBuildNumber {
-    Set-Content -Path "$($build_dir)/prev_version.txt" -Value "$($msix_package_build_number)"
+    Set-Content -Path "$($build_dir)/prev_version.txt" -Value "$($msix_package_build_number)`n$([DateTimeOffset]::Now.ToUnixTimeSeconds().ToString())"
 }
 
 task GetMsixPackageBuildNumber -Jobs GetPreviousMsixPackageBuildNumber, GetPackageBuildNumber, {
@@ -192,10 +212,107 @@ task MakeSignedMsixPackage -Jobs GetPrivateCert, MakeMsixPackage, WriteMsixPacka
 }
 
 
+task MakeAppInstallerFile -Jobs MakeBuildDir, GetMsixPackageBuildNumber, GetPrivateCertCN, {
+    requires -Variable appinstaller_base_url
+    requires -Variable package_base_url
+
+    Copy-Item -Path "$($appinstaller_template_local_path)" -Destination "$($appinstaller_local_path)" -Force -Recurse
+    $content = $(Get-Content -Path "$($appinstaller_local_path)")
+    $content = $content -replace "{VERSION}","$($msix_package_build_number)"
+    $content = $content -replace "{CN}", "$($private_cert_cn)"
+    $content = $content -replace "{APPINSTALLER_VERSION}", "$($appinstaller_version)"
+    $content = $content -replace "{APPINSTALLER_URL}", "$($appinstaller_base_url)/$($msix_package_name).appinstaller"
+    $content = $content -replace "{PACKAGE_URL}", "$($package_base_url)/$($msix_package_name).msix"
+    Set-Content -Path "$($appinstaller_local_path)" -Value $content
+}
+
+task MakeInstallInstructions {
+    requires -Variable package_base_url
+    requires -Variable appinstaller_base_url
+
+    $content = $(Get-Content -Path "$($instructions_template_local_path)")
+    $content = $content -replace "{APPINSTALLER_URL}","$($package_base_url)/$($msix_package_name).appinstaller"
+    $content = $content -replace "{PUBLIC_CERT_URL}","$($package_base_url)/public_cert.crt"
+    $script:install_instructions = $content
+}
+
+task MakeMsixChangelog {
+    $content = $(Get-Content -Path "$($full_changelog_local_path)")
+    $changelog_content = ""
+    foreach ($line in $content){
+        if($line -match "^\[([0-9]+)\].*$"){
+            $timestamp = $Matches[1]
+            if([int]$timestamp -gt [int]$previous_msix_package_timestamp){
+                $changelog_content += "<li>$($line -replace "^\[[0-9]+\]\s*(.*)$","`$1")</li>`n"
+            }
+        }
+    }
+    $content = ""
+    if($changelog_content){
+        $content += "<article><header><h1>Changelog (Sublime Text $($channel) Package)</h1></header>`n<ul>`n"
+        $content += $changelog_content
+        $content += "</ul></article>`n"
+    }
+    $script:msix_changelog = $content
+}
+
+task MakePackageChangelog -Jobs ExtractPackage, {
+    requires -Path "$($package_extract_dir)/changelog.txt"
+
+    $old_version = [System.Version]::new("$previous_msix_package_build_number")
+    $version = [int]"$($old_version.Major)$($old_version.Minor)"
+    $version += 1
+    $xml=[system.xml.linq.xelement]::parse("<root>" + $(get-content "$($package_extract_dir)/changelog.txt") + "</root>")
+    $articles = $xml.descendants("article").where({[int] $($_.Element("h2").value -replace ".*?([0-9][0-9]+).*","`$1") -ge $version})
+    $content = ""
+    if($articles.count){
+        $content += "<article><header><h1>Changelog (Sublime Text $($channel))</h1></header>`n"
+        foreach ($j in $articles){$content += $j.toString()}
+        $content += "</article>`n"
+    }
+    $script:package_changelog = $content
+}
+
+task MakeChangelog -Jobs MakePackageChangelog, MakeMsixChangelog, {
+    $script:changelog = $msix_changelog + $package_changelog
+    Set-Content -Path "$($changelog_local_path)" -Value $script:changelog
+}
+
+task MakeReleaseNote ?MakeInstallInstructions, MakeChangelog, {
+    $script:release_note = $script:install_instructions + $script:changelog
+    Set-Content -Path "$($release_note_local_path)" -Value $script:release_note
+}
+
+task CollectReleaseInfo -Jobs MakeReleaseNote, MakeChangelog, {
+    $out_files["$($release_note_local_path)"] = "./"
+    $out_files["$($changelog_local_path)"] = "./"
+
+}
+
+task CollectMsixPackage -Jobs MakeSignedMsixPackage, {
+    $out_files["$($msix_package)"] = "./"
+}
+
+task CollectAppInstallerFile -Jobs MakeAppInstallerFile, {
+    $out_files["$($appinstaller_local_path)"] = "./"
+
+}
+
+task CollectOutFiles CollectMsixPackage, ?CollectAppInstallerFile, CollectReleaseInfo
+
+task PrepareRelease -Jobs CollectOutFiles, MakeOutDir, {
+    foreach($item in $out_files.GetEnumerator()){
+        Copy-Item -Force -Path "$($item.Name)" -Destination "$($out_dir)/$($item.Value)" -Recurse
+    }
+}
 
 
 task MakeBuildDir -If {! (Test-Path -Path $($build_dir) -Type Container)} {
     New-Item -Type Directory -Path "$($build_dir)"
+}
+
+task MakeOutDir -If {! (Test-Path -Path $($out_dir) -Type Container)} {
+    New-Item -Type Directory -Path "$($out_dir)"
 }
 
 task . MakeBuildDir, ExtractPackage

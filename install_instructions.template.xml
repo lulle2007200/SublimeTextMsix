@@ -1,0 +1,8 @@
+<article>
+  <h1>How To Install</h1>
+  <ol>
+    <li>Download the <tt><a href="{PUBLIC_CERT_URL}">certificate</a></tt></li>
+    <li>Open it, click <tt>install certificate</tt>, select <tt>local machine</tt>, tick <tt>place all certificates in the following store</tt>, select <tt>trusted root certification authorities</tt>, then proceed to install the certificate. Installing the certificate as a root certificate is required, because the package is self signed with a self signed certificate, but can only be installed if the certificate is trusted.</li>
+    <li>Download the <tt><a href="{APPINSTALLER_URL}">appinstaller</a></tt>, open it to install the packge</li>
+  </ol>
+</article>
