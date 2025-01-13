@@ -54,8 +54,11 @@ task ExtractPackage -Jobs DownloadPackage, {
     Expand-Archive -LiteralPath "$($package_local_path)" -DestinationPath "$($package_extract_dir)" -Force
 }
 
-task AddMsixUpdatePackage {
-    Compress-Archive -Path "$($BuildRoot)/msix_update.py" -DestinationPath "$($package_extract_dir)/Packages/MSIX_util.sublime-package" -Force
+# TODO 
+task MakeMsixUtilPlugin
+
+task AddMsixUtilPlugin -Jobs MakeMsixUtilPlugin, {
+    Compress-Archive -Path "$($BuildRoot)/MsixUtilPlugin/*" -DestinationPath "$($package_extract_dir)/Packages/MSIX_util.sublime-package" -Force
 }
 
 task MakeShellExt {
@@ -68,7 +71,7 @@ task DeleteUnneededFromPackage {
 }
 
 # TODO prepare sublime package files for packaging
-task PreparePackage ExtractPackage, DeleteUnneededFromPackage, AddMsixUpdatePackage
+task PreparePackage ExtractPackage, DeleteUnneededFromPackage, AddMsixUtilPlugin
 
 
 # Certificates
