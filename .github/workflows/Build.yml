@@ -45,7 +45,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: WyriHaximus/github-action-get-previous-tag@v1
+      - uses: WyriHaximus/github-action-get-previous-tag@v1.4.0
         name: get previous tag
         id: previoustag
         with:
