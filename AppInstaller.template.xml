@@ -2,7 +2,8 @@
 <AppInstaller 
   Uri="{APPINSTALLER_URL}" 
   Version="{APPINSTALLER_VERSION}"
-  xmlns="http://schemas.microsoft.com/appx/appinstaller/2018">
+  xmlns="http://schemas.microsoft.com/appx/appinstaller/2018"
+  xmlns="http://schemas.microsoft.com/appx/appinstaller/2021">
   <MainPackage 
     Name="SublimeText" 
     Version="{VERSION}" 
@@ -10,6 +11,7 @@
     ProcessorArchitecture="x64"
     Uri="{PACKAGE_URL}" />
   <UpdateSettings>
-    <OnLaunch HoursBetweenUpdateChecks="8" ShowPrompt="true" UpdateBlocksActivation="false" />
+    <s4:ForceUpdateFromAnyVersion>true</s4:ForceUpdateFromAnyVersion>
+    <s4:AutomaticBackgroundTask/>
   </UpdateSettings>
 </AppInstaller>
