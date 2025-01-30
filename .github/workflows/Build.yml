@@ -112,6 +112,8 @@ jobs:
         name: create dummy commit
         if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' && inputs.do_release }}
         run: |
+          git config --global user.email "${{ github.actor }}@users.noreply.github.com"
+          git config --global user.name "${{ github.actor }}"
           git commit -m "dummy" --allow-empty
           git push
         
