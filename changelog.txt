@@ -1,0 +1,1 @@
+[1738241451] Do update checks in the background instead of checking on launch
