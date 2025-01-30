@@ -108,20 +108,10 @@ jobs:
           Write-Output "OUT_DIR=$($R.out)" >> $env:GITHUB_OUTPUT
 
 
-      - uses: velocibear/create-empty-commit@v1.0.0
-        name: create empty commit
-        if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' && inputs.do_release }}
+      - uses: GuillaumeFalourd/git-commit-push@v1.3
+        name: create dummy commit
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          email: ${{ github.actor}}@users.noreply.github.com
-          name: ${{ github.actor }}
-          message: dummy commit
-
-      - shell: pwsh
-        if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' && inputs.do_release }}
-        name: push
-        run: |
-          git push
+          empty: true
         
       - uses: ncipollo/release-action@v1.14.0
         name: create stable release
