@@ -110,6 +110,7 @@ jobs:
 
       - uses: velocibear/create-empty-commit@v1.0.0
         name: create empty commit
+        if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' && inputs.do_release }}
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           email: ${{ github.actor}}@users.noreply.github.com
