@@ -108,10 +108,12 @@ jobs:
           Write-Output "OUT_DIR=$($R.out)" >> $env:GITHUB_OUTPUT
 
 
-      - uses: GuillaumeFalourd/git-commit-push@v1.3
+      - shell: pwsh
         name: create dummy commit
-        with:
-          empty: true
+        if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' && inputs.do_release }}
+        run: |
+          git commit -m "dummy" --allow-empty
+          git push
         
       - uses: ncipollo/release-action@v1.14.0
         name: create stable release
