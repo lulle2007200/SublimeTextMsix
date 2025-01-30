@@ -116,6 +116,12 @@ jobs:
           email: ${{ github.actor}}@users.noreply.github.com
           name: ${{ github.actor }}
           message: dummy commit
+
+      - shell: pwsh
+        if: ${{ steps.build.outputs.BUILD_SUCCESS == 'True' && inputs.do_release }}
+        name: push
+        run: |
+          git push
         
       - uses: ncipollo/release-action@v1.14.0
         name: create stable release
