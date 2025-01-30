@@ -3,7 +3,7 @@
   Uri="{APPINSTALLER_URL}" 
   Version="{APPINSTALLER_VERSION}"
   xmlns="http://schemas.microsoft.com/appx/appinstaller/2018"
-  xmlns="http://schemas.microsoft.com/appx/appinstaller/2021">
+  xmlns:s4="http://schemas.microsoft.com/appx/appinstaller/2021">
   <MainPackage 
     Name="SublimeText" 
     Version="{VERSION}" 
