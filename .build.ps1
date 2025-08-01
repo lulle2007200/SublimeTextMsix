@@ -274,7 +274,7 @@ task MakePackageChangelog -Jobs ExtractPackage, {
     $old_version = [System.Version]::new("$previous_msix_package_build_number")
     $version = [int]"$($old_version.Major)$($old_version.Minor)"
     $version += 1
-    $xml=[system.xml.linq.xelement]::parse("<root>" + $(get-content "$($package_extract_dir)/changelog.txt") + "</root>")
+    $xml=[system.xml.linq.xelement]::parse("<root>" + $((get-content "$($package_extract_dir)/changelog.txt") -replace "<br>","<br/>") + "</root>")
     $articles = $xml.descendants("article").where({[int] $($_.Element("h2").value -replace ".*?([0-9][0-9]+).*","`$1") -ge $version})
     $content = ""
     if($articles.count){
