@@ -1,1 +1,2 @@
 [1738241451] Do update checks in the background instead of checking on launch
+[1762721717] Fix open here for paths that have spaces
