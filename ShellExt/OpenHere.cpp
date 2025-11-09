@@ -27,7 +27,7 @@ IFACEMETHODIMP OpenHere::Invoke(IShellItemArray* psiItemArray, IBindCtx*)
             startup_info.StartupInfo.dwFlags = STARTF_USESHOWWINDOW;
             startup_info.StartupInfo.wShowWindow = SW_SHOWNORMAL;
 
-            std::wstring cmd_line = L"-n \"" + std::wstring(name.get()) + "\"";
+            std::wstring cmd_line = L"-n \"" + std::wstring(name.get()) + L"\"";
 
             if (CreateProcessW(path.data(),
                 cmd_line.data(),
